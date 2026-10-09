@@ -64,3 +64,19 @@ export async function get<T>(db: DatabaseSync, sql: string, ...params: SqlValue[
   if (row === undefined || row === null) return undefined;
   return row as T;
 }
+
+const LISTING_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS idx_social_accounts_creator ON social_accounts(creator_id)",
+  "CREATE INDEX IF NOT EXISTS idx_metrics_account_latest ON metrics(account_id, captured_at DESC, id DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_deliveries_creator_since ON deliveries(creator_id, delivered_at)",
+];
+
+const listingIndexed = new WeakSet<DatabaseSync>();
+
+export async function ensureListingIndexes(db: DatabaseSync): Promise<void> {
+  if (listingIndexed.has(db)) return;
+  for (const sql of LISTING_INDEXES) {
+    await all(db, sql);
+  }
+  listingIndexed.add(db);
+}
