@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { deliveriesSince } from "./clock.ts";
-import { all, get } from "./db.ts";
+import { all, ensureListingIndexes, get } from "./db.ts";
 
 export type CreatorMatch = {
   id: string;
@@ -26,22 +26,6 @@ type CreatorPageRow = {
   total: number;
 };
 type CountRow = { n: number };
-
-const READ_INDEXES = [
-  "CREATE INDEX IF NOT EXISTS idx_social_accounts_creator ON social_accounts(creator_id)",
-  "CREATE INDEX IF NOT EXISTS idx_metrics_account_latest ON metrics(account_id, captured_at DESC, id DESC)",
-  "CREATE INDEX IF NOT EXISTS idx_deliveries_creator_since ON deliveries(creator_id, delivered_at)",
-];
-
-const indexed = new WeakSet<DatabaseSync>();
-
-async function ensureReadIndexes(db: DatabaseSync): Promise<void> {
-  if (indexed.has(db)) return;
-  for (const sql of READ_INDEXES) {
-    await all(db, sql);
-  }
-  indexed.add(db);
-}
 
 const PAGE_SQL = `
 SELECT id, name, niche_score, latest_reach, deliveries_90d, COUNT(*) OVER() AS total
@@ -103,7 +87,7 @@ export async function listCreators(
   );
   if (!campaign) return null;
 
-  await ensureReadIndexes(db);
+  await ensureListingIndexes(db);
   const since = deliveriesSince();
   const rows = await all<CreatorPageRow>(
     db,
